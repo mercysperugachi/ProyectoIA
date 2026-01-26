@@ -10,7 +10,7 @@ load_dotenv()
 
 app = FastAPI(title="NutriApp API con Memoria y Reset")
 
-# 2. CONFIGURACIÓN DE CORS (Para que tu compañero se conecte sin errores)
+# 2. CONFIGURACIÓN DE CORS (Para permitir solicitudes desde cualquier origen)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
