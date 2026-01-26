@@ -5,12 +5,12 @@ from google import genai
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-# 1. CARGAR CONFIGURACIÓN
+# CARGAR CONFIGURACIÓN
 load_dotenv()
 
-app = FastAPI(title="NutriApp API con Memoria y Reset")
+app = FastAPI(title="NutriApp API")
 
-# 2. CONFIGURACIÓN DE CORS (Para permitir solicitudes desde cualquier origen)
+# CONFIGURACIÓN DE CORS (Para permitir solicitudes desde cualquier origen)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,8 +18,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. CONFIGURACIÓN DE GEMINI
+# Modelos
+class Login(BaseModel):
+    usuario: str
+    password: str
+
+class Consulta(BaseModel):
+    texto: str
+    usuario_email: str
+
+# Usuarios simulados
+USUARIOS_DB = {
+    "admin@nutriapp.com": "nutria123",
+    "estudiante@epn.edu.ec": "nutria123"
+}
+
+# CONFIGURACIÓN DE GEMINI
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# DICCIONARIO PARA GUARDAR LA SESIÓN DE CADA USUARIO
+HISTORIAL_SESIONES = {}
 
 instrucciones_nutriapp = """
 CONTEXTO:
@@ -36,44 +54,65 @@ REGLAS ESPECÍFICAS:
 4. Seguridad: Siempre termina recomendaciones de dietas con la frase: 'Recuerda consultar con un profesional de la salud'.
 """
 
-# 4. VARIABLE GLOBAL DE SESIÓN (La memoria)
-# Esta función crea la sesión de chat con tus instrucciones
-def crear_nueva_sesion():
-    return client.chats.create(
-        model="gemini-2.0-flash",
-        config={"system_instruction": instrucciones_nutriapp}
-    )
+# funcion para crear una nueva sesión de chat
+def obtener_chat_usuario(email: str):
+    if email not in HISTORIAL_SESIONES:
+        HISTORIAL_SESIONES[email] = client.chats.create(
+            model="gemini-2.0-flash",
+            config={"system_instruction": instrucciones_nutriapp}
+        )
+    return HISTORIAL_SESIONES[email]
 
-# Inicializamos la primera sesión
-chat_session = crear_nueva_sesion()
 
-# 5. MODELO DE DATOS
-class Consulta(BaseModel):
-    texto: str
-
-# 6. ENDPOINTS (RUTAS)
+# ENDPOINTS (RUTAS)
 
 @app.get("/")
 def estado():
     return {"mensaje": "Servidor de NutriApp activo con memoria"}
+
+# Ruta de login
+@app.post("/login")
+async def login(datos: Login):
+    # Verificamos credenciales
+    if datos.usuario in USUARIOS_DB and USUARIOS_DB[datos.usuario] == datos.password:
+        return {
+            "estado": "exitoso",
+            "mensaje": f"Bienvenido a NutriApp, {datos.usuario}",
+            "token_simulado": "nutria" 
+        }
+    else:
+        return {
+            "estado": "error",
+            "mensaje": "Credenciales incorrectas"
+        }
 
 # RUTA PARA PREGUNTAR (Usa la memoria)
 @app.post("/preguntar")
 async def preguntar(consulta: Consulta):
     try:
         # Usamos send_message para que Gemini use el historial acumulado
-        response = chat_session.send_message(consulta.texto)
+        chat=obtener_chat_usuario(consulta.usuario_email)
+        response = chat.send_message(consulta.texto)
         return {"respuesta": response.text}
     except Exception as e:
         return {"error": f"Error al procesar: {str(e)}"}
 
 # RUTA PARA BORRAR LA MEMORIA
 @app.post("/reset")
-async def reset_chat():
-    global chat_session
+async def reset_chat(usuario_email: str):
     try:
-        # Reemplazamos la sesión actual por una nueva y vacía
-        chat_session = crear_nueva_sesion()
-        return {"mensaje": "Historial de NutriApp borrado con éxito. ¡Chat reiniciado!"}
+        if usuario_email in HISTORIAL_SESIONES:
+            del HISTORIAL_SESIONES[usuario_email]
+            return {"mensaje": f"Historial de {usuario_email} reiniciado."}
+        else:
+            return {"mensaje": "No se encontró historial para este usuario."}
     except Exception as e:
-        return {"error": f"No se pudo resetear: {str(e)}"}
+        return {"error": f"Error al reiniciar: {str(e)}"}
+    
+# RUTA PARA CERRAR SESIÓN
+@app.post("/logout")
+async def logout():
+    return {
+        "estado": "exitoso",
+        "mensaje": "Sesión cerrada. Tu historial se ha conservado para tu próxima entrada."
+    }
