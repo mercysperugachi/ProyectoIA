@@ -1,4 +1,3 @@
-# Librerías necesarias
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -7,24 +6,21 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
 # 1. CARGAR CONFIGURACIÓN
-# Carga la API Key desde el archivo .env para mayor seguridad
 load_dotenv()
 
-app = FastAPI(title="NutriApp Backend API")
+app = FastAPI(title="NutriApp API con Memoria y Reset")
 
-# 2. CONFIGURACIÓN DE CORS
-# Esto permite que el frontend de tu compañero (en otro puerto o PC) se comunique con tu API
+# 2. CONFIGURACIÓN DE CORS (Para que tu compañero se conecte sin errores)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todas las conexiones. En producción se limita.
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # 3. CONFIGURACIÓN DE GEMINI
-client = genai.Client(api_key="GEMINI_API_KEY")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Instrucciones de sistema detalladas para darle personalidad a tu app
 instrucciones_nutriapp = """
 CONTEXTO:
 Eres el asistente virtual experto de 'NutriApp', una plataforma para mejorar la salud alimenticia.
@@ -40,25 +36,44 @@ REGLAS ESPECÍFICAS:
 4. Seguridad: Siempre termina recomendaciones de dietas con la frase: 'Recuerda consultar con un profesional de la salud'.
 """
 
-# 4. MODELO DE DATOS
+# 4. VARIABLE GLOBAL DE SESIÓN (La memoria)
+# Esta función crea la sesión de chat con tus instrucciones
+def crear_nueva_sesion():
+    return client.chats.create(
+        model="gemini-2.0-flash",
+        config={"system_instruction": instrucciones_nutriapp}
+    )
+
+# Inicializamos la primera sesión
+chat_session = crear_nueva_sesion()
+
+# 5. MODELO DE DATOS
 class Consulta(BaseModel):
     texto: str
 
-# 5. ENDPOINTS (RUTAS)
-@app.get("/")
-def home():
-    return {"mensaje": "Servidor de NutriApp activo y listo"}
+# 6. ENDPOINTS (RUTAS)
 
+@app.get("/")
+def estado():
+    return {"mensaje": "Servidor de NutriApp activo con memoria"}
+
+# RUTA PARA PREGUNTAR (Usa la memoria)
 @app.post("/preguntar")
-async def chat_api(consulta: Consulta):
+async def preguntar(consulta: Consulta):
     try:
-        # Llamada a la API de Gemini con las instrucciones de sistema
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=consulta.texto,
-            config={"system_instruction": instrucciones_nutriapp}
-        )
+        # Usamos send_message para que Gemini use el historial acumulado
+        response = chat_session.send_message(consulta.texto)
         return {"respuesta": response.text}
-    
     except Exception as e:
-        return {"error": f"Ocurrió un error en el servidor: {str(e)}"}
+        return {"error": f"Error al procesar: {str(e)}"}
+
+# RUTA PARA BORRAR LA MEMORIA
+@app.post("/reset")
+async def reset_chat():
+    global chat_session
+    try:
+        # Reemplazamos la sesión actual por una nueva y vacía
+        chat_session = crear_nueva_sesion()
+        return {"mensaje": "Historial de NutriApp borrado con éxito. ¡Chat reiniciado!"}
+    except Exception as e:
+        return {"error": f"No se pudo resetear: {str(e)}"}
