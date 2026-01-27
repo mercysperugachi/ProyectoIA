@@ -58,7 +58,7 @@ REGLAS ESPECÍFICAS:
 def obtener_chat_usuario(email: str):
     if email not in HISTORIAL_SESIONES:
         HISTORIAL_SESIONES[email] = client.chats.create(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash", # Modelo de Gemini
             config={"system_instruction": instrucciones_nutriapp}
         )
     return HISTORIAL_SESIONES[email]
