@@ -1,12 +1,18 @@
 import os
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Depends, HTTPException
 from google import genai
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+# MODULOS DE DATOS
+from database import engine, get_db
+import models
+import schemas
 
 # CARGAR CONFIGURACIÓN
 load_dotenv()
+
 
 app = FastAPI(title="NutriApp API")
 
@@ -17,21 +23,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Modelos
-class Login(BaseModel):
-    usuario: str
-    password: str
-
-class Consulta(BaseModel):
-    texto: str
-    usuario_email: str
-
-# Usuarios simulados
-USUARIOS_DB = {
-    "admin@nutriapp.com": "nutria123",
-    "estudiante@epn.edu.ec": "nutria123"
-}
 
 # CONFIGURACIÓN DE GEMINI
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -68,46 +59,71 @@ def obtener_chat_usuario(email: str):
 
 @app.get("/")
 def estado():
-    return {"mensaje": "Servidor de NutriApp activo con memoria"}
+    return {"mensaje": "Servidor de NutriApp corriendo correctamente."}
+
+# Ruta de registro
+@app.post("/registro")
+def registrar_usuario(datos: schemas.UserSchema, db: Session = Depends(get_db)):
+    # Buscamos si el email ya existe en Supabase
+    usuario_existe = db.query(models.UsuarioDB).filter(models.UsuarioDB.email == datos.email).first()
+    if usuario_existe:
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+    
+    # Si no existe, lo creamos
+    nuevo_usuario = models.UsuarioDB(email=datos.email, password=datos.password)
+    db.add(nuevo_usuario)
+    db.commit()
+    return {"mensaje": f"Usuario {datos.email} guardado en la nube correctamente."} 
 
 # Ruta de login
 @app.post("/login")
-async def login(datos: Login):
-    # Verificamos credenciales
-    if datos.usuario in USUARIOS_DB and USUARIOS_DB[datos.usuario] == datos.password:
-        return {
-            "estado": "exitoso",
-            "mensaje": f"Bienvenido a NutriApp, {datos.usuario}",
-            "token_simulado": "nutria" 
-        }
-    else:
-        return {
-            "estado": "error",
-            "mensaje": "Credenciales incorrectas"
-        }
+def login(datos: schemas.UserSchema, db: Session = Depends(get_db)):
+    # Buscamos el usuario en la base de datos 
+    usuario = db.query(models.UsuarioDB).filter(models.UsuarioDB.email == datos.email).first()
+    
+    if not usuario:
+        return {"estado": "error", "mensaje": "Usuario no registrado"}
+    
+    if usuario.password != datos.password:
+        return {"estado": "error", "mensaje": "Contraseña incorrecta"}
+    
+    return {
+        "estado": "exitoso",
+        "mensaje": f"Bienvenido de nuevo, {usuario.email}",
+        "token": "token_supabase_real"
+    }
 
-# RUTA PARA PREGUNTAR (Usa la memoria)
+# RUTA PREGUNTAR (guarda en Supabase)
 @app.post("/preguntar")
-async def preguntar(consulta: Consulta):
+def preguntar(consulta: schemas.Consulta, db: Session = Depends(get_db)):
     try:
-        # Usamos send_message para que Gemini use el historial acumulado
-        chat=obtener_chat_usuario(consulta.usuario_email)
+        # Obtener respuesta de Gemini (usando memoria RAM para contexto inmediato)
+        chat = obtener_chat_usuario(consulta.usuario_email)
         response = chat.send_message(consulta.texto)
-        return {"respuesta": response.text}
-    except Exception as e:
-        return {"error": f"Error al procesar: {str(e)}"}
+        respuesta_texto = response.text
 
-# RUTA PARA BORRAR LA MEMORIA
-@app.post("/reset")
-async def reset_chat(usuario_email: str):
-    try:
-        if usuario_email in HISTORIAL_SESIONES:
-            del HISTORIAL_SESIONES[usuario_email]
-            return {"mensaje": f"Historial de {usuario_email} reiniciado."}
-        else:
-            return {"mensaje": "No se encontró historial para este usuario."}
+        # GUARDAR EN SUPABASE (Base de Datos)
+        nuevo_chat = models.HistorialDB(
+            usuario_email=consulta.usuario_email,
+            mensaje_usuario=consulta.texto,
+            respuesta_ia=respuesta_texto
+        )
+        db.add(nuevo_chat)
+        db.commit()
+
+        # Retornar respuesta al usuario
+        return {"respuesta": respuesta_texto}
+
     except Exception as e:
-        return {"error": f"Error al reiniciar: {str(e)}"}
+        return {"error": f"Error IA: {str(e)}"}
+    
+# RUTA PARA REINICIAR LA SESIÓN DE CHAT
+@app.post("/resetear_sesion")
+def resetear_chat(usuario_email: str):
+    if usuario_email in HISTORIAL_SESIONES:
+        del HISTORIAL_SESIONES[usuario_email]
+        return {"mensaje": "Memoria reiniciada"}
+    return {"mensaje": "No hay memoria activa"}
     
 # RUTA PARA CERRAR SESIÓN
 @app.post("/logout")
