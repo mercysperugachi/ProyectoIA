@@ -16,6 +16,19 @@ load_dotenv()
 
 app = FastAPI(title="NutriApp API")
 
+origins = [
+    "http://localhost:3000", # Tu frontend
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins, # Permitir estos orígenes
+    allow_credentials=True,
+    allow_methods=["*"],   # Permitir todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],   # Permitir todos los headers
+)
+
 # CONFIGURACIÓN DE CORS (Para permitir solicitudes desde cualquier origen)
 app.add_middleware(
     CORSMiddleware,
