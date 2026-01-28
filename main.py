@@ -95,11 +95,11 @@ def login(datos: schemas.UserSchema, db: Session = Depends(get_db)):
     usuario = db.query(models.UsuarioDB).filter(models.UsuarioDB.email == datos.email).first()
     
     if not usuario:
-        return {"estado": "error", "mensaje": "Usuario no registrado"}
+        raise HTTPException(status_code=404, detail="Usuario no registrado")
     
     if usuario.password != datos.password:
-        return {"estado": "error", "mensaje": "Contraseña incorrecta"}
-    
+        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
+
     return {
         "estado": "exitoso",
         "mensaje": f"Bienvenido de nuevo, {usuario.email}",
