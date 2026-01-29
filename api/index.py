@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI, Depends, HTTPException
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
