@@ -1,9 +1,17 @@
 import os
+import sys
+import numpy as np
+import joblib
 from fastapi import FastAPI, Depends, HTTPException
 import google.generativeai as genai
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+
+# LIBRERÍAS DE MACHINE LEARNING 
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
 # MODULOS DE DATOS (Con imports relativos correctos)
 from .database import engine, get_db
@@ -12,6 +20,12 @@ from . import schemas
 
 # CARGAR CONFIGURACIÓN
 load_dotenv()
+
+try:
+    models.Base.metadata.create_all(bind=engine)
+    print("Base de datos conectada y tablas verificadas.")
+except Exception as e:
+    print(f"Error conectando a la BD: {e}")
 
 app = FastAPI(title="NutriApp API")
 

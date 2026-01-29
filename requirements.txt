@@ -6,3 +6,7 @@ pydantic
 sqlalchemy
 psycopg2-binary
 requests
+scikit-learn
+pandas
+joblib
+numpy
