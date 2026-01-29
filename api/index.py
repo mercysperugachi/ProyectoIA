@@ -55,7 +55,7 @@ def obtener_chat_usuario(email: str):
     if email not in HISTORIAL_SESIONES:
         # 1. Definimos el modelo aquí (usando gemini-1.5-flash que es estable)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.5-flash",
             system_instruction=instrucciones_nutriapp
         )
         # 2. Iniciamos el chat correctamente
