@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 # MODULOS DE DATOS
 from .database import engine, get_db
-import models
-import schemas
+from . import models
+from . import schemas
 
 # CARGAR CONFIGURACIÓN
 load_dotenv()
