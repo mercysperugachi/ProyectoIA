@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.sql import func
-from database import Base
+from .database import Base
 
 # Tabla de Usuarios
 class UsuarioDB(Base):
