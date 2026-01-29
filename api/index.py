@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 # MODULOS DE DATOS
-from database import engine, get_db
+from .database import engine, get_db
 import models
 import schemas
 
