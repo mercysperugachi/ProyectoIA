@@ -19,7 +19,7 @@ La arquitectura sigue los estándares de desarrollo moderno, garantizando valida
 A continuación, se presenta la demostración operativa del backend consumido mediante la interfaz Swagger UI y las pruebas de los modelos de IA y ML.
 
 ### Video Explicativo del Proyecto
-[https://youtu.be/TU_ENLACE_AQUI]
+[[https://youtu.be/TU_ENLACE_AQUI](https://youtu.be/60bg9Hq-gcQ)]
 
 ---
 
