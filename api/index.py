@@ -33,7 +33,7 @@ app = FastAPI(title="NutriApp API")
 origins = [
     "http://localhost:3000", # frontend local
     "http://127.0.0.1:3000",
-    "https://tu-frontend-en-vercel.vercel.app", 
+    "https://nutriapp-rust.vercel.app", 
     "*" # Permitir todos para evitar errores por ahora
 ]
 
